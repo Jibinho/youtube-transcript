@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "api/youtube_transcript.py": {
-      "runtime": "python3.11"
-    }
-  }
-}
