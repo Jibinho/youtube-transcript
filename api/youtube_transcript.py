@@ -154,27 +154,3 @@ class handler(BaseHTTPRequestHandler):
                 'success': False,
                 'error': str(e)
             }).encode())
-```
-
-4. Clique **"Commit changes"**
-
----
-
-## ✅ Étape 4 : Attends le redéploiement
-
-1. Retourne sur **Vercel** : https://vercel.com/dashboard
-2. Clique sur ton projet
-3. Tu devrais voir un nouveau déploiement en cours
-4. Attends 1-2 minutes ⏱️
-
----
-
-## 🧪 Étape 5 : Teste l'API
-
-Une fois le déploiement terminé :
-
-1. Va sur **reqbin.com**
-2. Change pour **POST**
-3. URL : 
-```
-   https://ton-site.vercel.app/api/youtube_transcript
