@@ -6,6 +6,7 @@ from youtube_transcript_api._errors import (
     NoTranscriptFound,
     VideoUnavailable
 )
+from http.server import BaseHTTPRequestHandler
 
 
 def extract_video_id(url):
@@ -40,7 +41,6 @@ def get_transcript(video_id, language_codes=['fr', 'en']):
     try:
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
         
-        # Cherche une transcription dans les langues préférées
         for lang in language_codes:
             try:
                 transcript = transcript_list.find_transcript([lang])
@@ -48,7 +48,6 @@ def get_transcript(video_id, language_codes=['fr', 'en']):
             except NoTranscriptFound:
                 continue
         
-        # Si aucune langue préférée, prend la première disponible
         available_transcripts = list(transcript_list)
         if available_transcripts:
             transcript = available_transcripts[0]
@@ -85,7 +84,6 @@ def format_transcript_to_markdown(transcript, video_id, language):
         seconds = int(entry['start'])
         text = entry['text'].strip()
         
-        # Crée un lien cliquable vers le timestamp
         link = f"[⏱️ {timestamp}](https://www.youtube.com/watch?v={video_id}&t={seconds}s)"
         
         markdown_lines.append(f"{link} {text}")
@@ -94,86 +92,89 @@ def format_transcript_to_markdown(transcript, video_id, language):
     return "\n".join(markdown_lines)
 
 
-def handler(request):
+class handler(BaseHTTPRequestHandler):
     """Fonction principale Vercel"""
     
-    # Gestion CORS
-    headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Content-Type': 'application/json'
-    }
+    def _set_headers(self, status_code=200):
+        self.send_response(status_code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
     
-    # Gestion preflight
-    if request.method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': ''
-        }
+    def do_OPTIONS(self):
+        self._set_headers(200)
+        self.wfile.write(b'')
     
-    if request.method != 'POST':
-        return {
-            'statusCode': 405,
-            'headers': headers,
-            'body': json.dumps({'error': 'Méthode non autorisée. Utilisez POST.'})
-        }
-    
-    try:
-        # Parse le body
-        body = json.loads(request.body)
-        youtube_url = body.get('url')
-        languages = body.get('languages', ['fr', 'en'])
-        
-        if not youtube_url:
-            return {
-                'statusCode': 400,
-                'headers': headers,
-                'body': json.dumps({'error': 'URL YouTube manquante'})
-            }
-        
-        # Extrait l'ID vidéo
-        video_id = extract_video_id(youtube_url)
-        if not video_id:
-            return {
-                'statusCode': 400,
-                'headers': headers,
-                'body': json.dumps({'error': 'URL YouTube invalide'})
-            }
-        
-        # Récupère la transcription
-        transcript, language, is_generated = get_transcript(video_id, languages)
-        
-        if not transcript:
-            return {
-                'statusCode': 404,
-                'headers': headers,
-                'body': json.dumps({'error': 'Aucune transcription disponible'})
-            }
-        
-        # Formate en markdown
-        markdown = format_transcript_to_markdown(transcript, video_id, language)
-        
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': json.dumps({
+    def do_POST(self):
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            
+            body = json.loads(post_data.decode('utf-8'))
+            youtube_url = body.get('url')
+            languages = body.get('languages', ['fr', 'en'])
+            
+            if not youtube_url:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({'error': 'URL YouTube manquante'}).encode())
+                return
+            
+            video_id = extract_video_id(youtube_url)
+            if not video_id:
+                self._set_headers(400)
+                self.wfile.write(json.dumps({'error': 'URL YouTube invalide'}).encode())
+                return
+            
+            transcript, language, is_generated = get_transcript(video_id, languages)
+            
+            if not transcript:
+                self._set_headers(404)
+                self.wfile.write(json.dumps({'error': 'Aucune transcription disponible'}).encode())
+                return
+            
+            markdown = format_transcript_to_markdown(transcript, video_id, language)
+            
+            response = {
                 'success': True,
                 'video_id': video_id,
                 'language': language,
                 'is_generated': is_generated,
                 'segments_count': len(transcript),
                 'markdown': markdown
-            }, ensure_ascii=False)
-        }
-    
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': headers,
-            'body': json.dumps({
+            }
+            
+            self._set_headers(200)
+            self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+        
+        except Exception as e:
+            self._set_headers(500)
+            self.wfile.write(json.dumps({
                 'success': False,
                 'error': str(e)
-            })
-        }
+            }).encode())
+```
+
+4. Clique **"Commit changes"**
+
+---
+
+## ✅ Étape 4 : Attends le redéploiement
+
+1. Retourne sur **Vercel** : https://vercel.com/dashboard
+2. Clique sur ton projet
+3. Tu devrais voir un nouveau déploiement en cours
+4. Attends 1-2 minutes ⏱️
+
+---
+
+## 🧪 Étape 5 : Teste l'API
+
+Une fois le déploiement terminé :
+
+1. Va sur **reqbin.com**
+2. Change pour **POST**
+3. URL : 
+```
+   https://ton-site.vercel.app/api/youtube_transcript
