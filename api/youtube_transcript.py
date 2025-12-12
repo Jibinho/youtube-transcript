@@ -94,8 +94,8 @@ def format_transcript_to_markdown(transcript, video_id, language):
     return "\n".join(markdown_lines)
 
 
-def handler(event, context):
-    """Fonction principale Netlify"""
+def handler(request):
+    """Fonction principale Vercel"""
     
     # Gestion CORS
     headers = {
@@ -106,14 +106,14 @@ def handler(event, context):
     }
     
     # Gestion preflight
-    if event['httpMethod'] == 'OPTIONS':
+    if request.method == 'OPTIONS':
         return {
             'statusCode': 200,
             'headers': headers,
             'body': ''
         }
     
-    if event['httpMethod'] != 'POST':
+    if request.method != 'POST':
         return {
             'statusCode': 405,
             'headers': headers,
@@ -122,7 +122,7 @@ def handler(event, context):
     
     try:
         # Parse le body
-        body = json.loads(event['body'])
+        body = json.loads(request.body)
         youtube_url = body.get('url')
         languages = body.get('languages', ['fr', 'en'])
         
